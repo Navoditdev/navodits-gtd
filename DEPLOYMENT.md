@@ -2,23 +2,25 @@
 
 ## Current state
 
-The app is a working local-storage PWA with a private Sites preview. Vercel configuration and the first Supabase database migration are prepared. Supabase login, cloud sync, local-to-cloud import, and conflict resolution are the next implementation stage; adding environment variables alone does not enable them.
+The app includes Supabase email-link sign-in and account-scoped offline caching. Cloud saves use revision checks: changes on two devices require an explicit choice and offer a device backup before replacing either copy. Sync runs after edits, on reconnect/focus, and every 15 seconds while open. This version does not merge concurrent edits automatically.
 
-## Accounts and projects
+The workspace schema has been applied to Supabase project `zsktdwvsgfykluvfshxl`. Both tables have row-level security. Workspace access requires the signed-in user's ID and the owner email in the administrator-managed access table. The Supabase security advisor reported no findings after setup.
 
-1. Connect the Supabase and Vercel integrations, and select the intended projects. A new Supabase project can be named `navodits-gtd`.
-2. Apply `supabase/migrations/202611060001_workspace.sql` to that project, then verify the access policies using an owner session, a different account, and an unauthenticated request. This migration has not been run against a live database yet.
-3. Configure the app owner's Supabase Auth user and disable public signups for this personal installation. The Supabase dashboard login and the GTD app login are separate accounts.
-4. Implement and verify authenticated sync before treating a Vercel deployment as the cloud version. Keep the existing private preview available during the transition.
-5. Import `Navoditdev/navodits-gtd` into Vercel. Build command: `npm run build`. Output directory: `dist`. The repository includes `vercel.json`.
-6. Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel for the cloud-enabled app. A publishable key is intended for browser use and relies on the database access policies. Never put a secret or service-role key in browser code or Git.
+Vercel account linking and deployment are pending CLI authentication. An authenticated end-to-end check has not been completed.
 
-## Data migration and checks
+## Vercel configuration
 
-- Export a JSON backup from the current app before moving. Browser storage belongs to an origin; a new Vercel URL cannot read data stored at the private preview URL.
-- Import the backup into the signed-in account with explicit confirmation.
-- Check Android-to-desktop and desktop-to-Android changes, offline capture and reconnection, concurrent edits, deletions, and Saturday review deduplication.
-- Confirm that signing out hides account data and that another account cannot access it.
-- Open the production app online, allow the service worker to install, and check reopening it offline before installing the PWA on Android.
+- Project/repository: `Navoditdev/navodits-gtd`.
+- Framework: Vite. Build: `npm run build`. Output: `dist`.
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel. These are browser-visible values; never use a secret/service-role key.
+- Set the production URL as Supabase Auth Site URL and add it to permitted redirect URLs. The sign-in screen requests a magic link returning to the current origin.
+- Supabase Auth must allow the owner's first email signup. Database access remains limited to the allowlisted owner, even if another account signs up. After the first owner login, public signup can be disabled in the dashboard.
+- Default Supabase email delivery may be limited to project-team addresses. Use custom SMTP if broader email delivery is needed.
 
-A custom domain can be added after the app is verified on its Vercel URL.
+## Moving existing data
+
+Export a JSON backup from the old preview. Browser storage belongs to an origin; Vercel cannot read the preview's storage. Sign into the deployed app, then import the backup from workspace settings. Fresh cloud workspaces start empty, with the automatic Saturday review task.
+
+## Checks before relying on cloud sync
+
+Confirm email-link login, Android-to-desktop changes, offline capture/reconnection, simultaneous edits, and sign-out. The app shell remains a PWA and caches static files; Supabase API responses are not service-worker cached. An offline cache is retained per account on the device after sign-out and can be reopened only after that account signs in again. Use trusted devices and export backups regularly.

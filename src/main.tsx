@@ -5,11 +5,11 @@ import "@fontsource/inter/latin-500.css";
 import "@fontsource/inter/latin-600.css";
 import "./style.css";
 import "./paper.css";
-import App from "./App";
+import CloudApp from "./CloudApp";
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <CloudApp />
   </React.StrictMode>,
 );
 

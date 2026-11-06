@@ -2,6 +2,14 @@
 -- Each account owns one versioned workspace. Offline edits will use the
 -- revision for optimistic concurrency, preventing a blind last-write-wins save.
 begin;
+create table public.navodit_access (email text primary key);
+alter table public.navodit_access enable row level security;
+revoke all on public.navodit_access from public, anon, authenticated;
+grant select on public.navodit_access to authenticated;
+create policy "Read own access" on public.navodit_access for select to authenticated
+using (email = (select auth.jwt() ->> 'email'));
+insert into public.navodit_access(email) values ('navodit.sh06@gmail.com');
+
 
 create table public.navodit_workspaces (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -20,16 +28,16 @@ grant update (state, revision) on public.navodit_workspaces to authenticated;
 
 create policy "Read your own workspace"
   on public.navodit_workspaces for select to authenticated
-  using ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and exists (select 1 from public.navodit_access where email = (select auth.jwt() ->> 'email')));
 
 create policy "Create your own workspace"
   on public.navodit_workspaces for insert to authenticated
-  with check ((select auth.uid()) = user_id and revision = 1);
+  with check ((select auth.uid()) = user_id and exists (select 1 from public.navodit_access where email = (select auth.jwt() ->> 'email')) and revision = 1);
 
 create policy "Update your own workspace"
   on public.navodit_workspaces for update to authenticated
-  using ((select auth.uid()) = user_id)
-  with check ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and exists (select 1 from public.navodit_access where email = (select auth.jwt() ->> 'email')))
+  with check ((select auth.uid()) = user_id and exists (select 1 from public.navodit_access where email = (select auth.jwt() ->> 'email')));
 
 create function public.navodit_workspace_revision()
 returns trigger

@@ -290,8 +290,10 @@ function Modal({
   );
 }
 
-export default function App() {
-  const [data, setData] = useState<Data>(load);
+export default function App({ cloud }: { cloud?: { data: Data; setData: React.Dispatch<React.SetStateAction<Data>>; status: string; sync: () => void; signOut: () => void } }) {
+  const [localData, setLocalData] = useState<Data>(load);
+  const data = cloud?.data ?? localData;
+  const setData = cloud?.setData ?? setLocalData;
   const [page, setPage] = useState<Page>("Today");
   const [mobile, setMobile] = useState(false);
   const [taskDraft, setTaskDraft] = useState<Task | null>(null);
@@ -387,7 +389,7 @@ export default function App() {
         "content",
         data.settings.theme === "dark" ? "#1c1916" : "#f6f1e7",
       );
-    setStorageError(!persist(data));
+    if (!cloud) setStorageError(!persist(data));
   }, [data]);
   useEffect(() => {
     if (!toast) return;
@@ -1996,7 +1998,7 @@ export default function App() {
         <div className="sidebar-bottom">
           <div className="local-status">
             <span className={"status-dot " + (!online ? "offline" : "")} />
-            {online ? "Saved on this device" : "Offline · saved on this device"}
+            {cloud ? cloud.status : online ? "Saved on this device" : "Offline · saved on this device"}
           </div>
           <button
             className="profile"
@@ -2675,6 +2677,7 @@ export default function App() {
       {settings && (
         <Modal title="Your workspace" onClose={() => setSettings(false)}>
           <div className="form-body settings-body">
+            {cloud && <section className="cloud-settings"><p>{cloud.status}</p><button onClick={cloud.sync}>Sync now</button><button onClick={cloud.signOut}>Sign out</button></section>}
             <div className="settings-intro">
               <span className="avatar large">N</span>
               <div>
@@ -2729,10 +2732,9 @@ export default function App() {
               <span className="fixed-limit">2 active projects</span>
             </div>
             <div className="settings-data">
-              <h3>Your data, on this device</h3>
+              <h3>{cloud ? "Your data and backups" : "Your data, on this device"}</h3>
               <p>
-                This first version saves in your browser. Phone and desktop are
-                separate for now. Export a backup to keep or transfer your data.
+                {cloud ? "Your workspace syncs between signed-in devices. Offline edits wait on this device until you reconnect. Export a backup before importing or replacing data." : "This preview saves in your browser. Export a backup to keep or transfer your data."}
               </p>
               <div className="settings-data-actions">
                 <button className="secondary-button" onClick={exportData}>
@@ -2757,7 +2759,7 @@ export default function App() {
                         }
                         if (
                           !window.confirm(
-                            "Replace the data on this device with this backup? Export your current data first if you want to keep it.",
+                            "Replace your workspace with this backup? This will also replace the cloud copy when synced. Export your current data first if you want to keep it.",
                           )
                         )
                           return;

@@ -65,13 +65,17 @@ import {
   availableTask,
   rankTasks,
   validData,
+  normalize,
 } from "./model";
+
+import Practices from "./Practices";
 
 const nav: [Page, typeof Sun][] = [
   ["Today", Sun],
   ["Inbox", Inbox],
   ["What can I do now?", Zap],
   ["Projects", Layers],
+  ["Practices", BookOpen],
   ["Calendar", CalendarDays],
   ["Exploration", Compass],
   ["Weekly review", CheckCheck],
@@ -93,8 +97,8 @@ const reviewSteps = [
     "Calendar",
   ],
   [
-    "Give projects a next action",
-    "Every active project needs one small, visible next step.",
+    "Review projects and practices",
+    "Check projects and ongoing practices. Give each a small, visible next step.",
     "Projects",
   ],
   [
@@ -315,6 +319,9 @@ export default function App() {
   const [reviewDone, setReviewDone] = useState(false);
   const [focusSeconds, setFocusSeconds] = useState(0);
   const [focusRunning, setFocusRunning] = useState(false);
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [page, selectedProject]);
   const today = dateKey();
   const flash = (message: string) => setToast(message);
   const change = (fn: (d: Data) => Data) => setData((d) => fn(d));
@@ -347,7 +354,7 @@ export default function App() {
       category: projectCategory === "coursework" ? "coursework" : "personal",
       course: "",
       status: "active",
-      color: "violet",
+      color: "terracotta",
     });
   const newExploration = () =>
     setExploreDraft({
@@ -365,7 +372,7 @@ export default function App() {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute(
         "content",
-        data.settings.theme === "dark" ? "#111214" : "#f8f8f7",
+        data.settings.theme === "dark" ? "#1c1916" : "#f6f1e7",
       );
     setStorageError(!persist(data));
   }, [data]);
@@ -602,12 +609,14 @@ export default function App() {
   const personalPanel = (
     <div className="side-section">
       <div className="section-title">
-        <h3>Personal projects</h3>
+        <h3>Active personal projects</h3>
         <span className="subtle">
           {count} / {data.settings.limit}
         </span>
       </div>
-      <p className="helper">A little space to do things well.</p>
+      <p className="helper">
+        Two at a time. Paused and someday stay unlimited.
+      </p>
       {data.projects
         .filter((p) => p.category === "personal" && p.status === "active")
         .map((p) => (
@@ -615,7 +624,7 @@ export default function App() {
             key={p.id}
             className="side-project"
             onClick={() => {
-              setPage("Projects");
+              setPage(p.category === "practice" ? "Practices" : "Projects");
               setSelectedProject(p.id);
             }}
           >
@@ -636,7 +645,7 @@ export default function App() {
               category: "personal",
               course: "",
               status: "active",
-              color: "violet",
+              color: "terracotta",
             });
           }}
         >
@@ -1127,7 +1136,9 @@ export default function App() {
       );
     }
     const filtered = data.projects.filter(
-      (p) => projectCategory === "all" || p.category === projectCategory,
+      (p) =>
+        p.category !== "practice" &&
+        (projectCategory === "all" || p.category === projectCategory),
     );
     return (
       <>
@@ -1152,8 +1163,11 @@ export default function App() {
                   : "Personal"}
               <span>
                 {
-                  data.projects.filter((p) => c === "all" || p.category === c)
-                    .length
+                  data.projects.filter(
+                    (p) =>
+                      p.category !== "practice" &&
+                      (c === "all" || p.category === c),
+                  ).length
                 }
               </span>
             </button>
@@ -1170,7 +1184,7 @@ export default function App() {
               <strong>
                 {count} of {data.settings.limit}
               </strong>{" "}
-              personal projects active
+              personal projects active · paused and someday are unlimited
             </span>
             <button className="text-button" onClick={() => setSettings(true)}>
               Protect your focus <Settings size={13} />
@@ -1629,7 +1643,7 @@ export default function App() {
                     ).length
                   }
                 </b>
-                <span>projects need a next action</span>
+                <span>projects or practices need a next action</span>
               </div>
               <div>
                 <b>
@@ -1690,7 +1704,15 @@ export default function App() {
         : [...d.projects, value],
     }));
     setProjectDraft(null);
-    flash("Project saved.");
+    if (value.category === "practice") {
+      setPage("Practices");
+      setSelectedProject(value.id);
+    }
+    flash(
+      value.category === "practice"
+        ? "Practice saved. A thread you can keep returning to."
+        : "Project saved.",
+    );
   }
   function saveExploration(e: FormEvent) {
     e.preventDefault();
@@ -1732,7 +1754,7 @@ export default function App() {
       category: "personal",
       status: "active",
       course: "",
-      color: "violet",
+      color: "terracotta",
     });
   }
   function exportData() {
@@ -1751,6 +1773,18 @@ export default function App() {
     Inbox: renderInbox,
     "What can I do now?": renderNow,
     Projects: renderProjects,
+    Practices: () => (
+      <Practices
+        data={data}
+        selected={selectedProject}
+        select={setSelectedProject}
+        change={change}
+        edit={setProjectDraft}
+        addTask={newTask}
+        taskRow={taskRow}
+        flash={flash}
+      />
+    ),
     Calendar: renderCalendar,
     Exploration: renderExploration,
     "Weekly review": renderReview,
@@ -1771,10 +1805,10 @@ export default function App() {
           ...data.projects.map((p) => ({
             id: p.id,
             title: p.name,
-            kind: "Project",
+            kind: p.category === "practice" ? "Practice" : "Project",
             open: () => {
               setSearch(null);
-              setPage("Projects");
+              setPage(p.category === "practice" ? "Practices" : "Projects");
               setSelectedProject(p.id);
             },
           })),
@@ -1804,7 +1838,7 @@ export default function App() {
       <aside className={"sidebar " + (mobile ? "mobile-open" : "")}>
         <button className="workspace" onClick={() => go("Today")}>
           <span className="brand-mark">
-            <Layers size={19} />
+            <BookOpen size={19} />
           </span>
           <span>Navodit’s GTD</span>
           <ChevronDown size={13} />
@@ -1833,7 +1867,7 @@ export default function App() {
               className={
                 "nav-item " +
                 (page === name ? "active" : "") +
-                (i === 5 ? " nav-separated" : "")
+                (name === "Exploration" ? " nav-separated" : "")
               }
               onClick={() => go(name)}
             >
@@ -1930,6 +1964,19 @@ export default function App() {
         </div>
       </aside>
       <div className="app-body">
+        {data.notice && (
+          <div className="migration-notice" role="status">
+            <BookOpen size={16} />
+            <p>{data.notice}</p>
+            <button
+              className="icon-button"
+              aria-label="Dismiss project limit update"
+              onClick={() => change((d) => ({ ...d, notice: undefined }))}
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
         <header className="topbar">
           <div className="breadcrumb">
             <button
@@ -1939,10 +1986,10 @@ export default function App() {
             >
               <Menu size={20} />
             </button>
-            <span className="breadcrumb-home">My workspace</span>
+            <span className="breadcrumb-home">Navodit’s GTD</span>
             <span className="breadcrumb-slash">/</span>
             <span>
-              {selectedProject && page === "Projects"
+              {selectedProject && (page === "Projects" || page === "Practices")
                 ? getProject(selectedProject)?.name
                 : page}
             </span>
@@ -1985,7 +2032,7 @@ export default function App() {
               )}
             </button>
             <span className="topbar-divider" />
-            <span className="version-label">YOUR SPACE, YOUR PACE</span>
+            <span className="version-label">A PERSONAL NOTEBOOK</span>
           </div>
         </header>
         {storageError && (
@@ -2058,7 +2105,7 @@ export default function App() {
               </label>
               <div className="form-grid">
                 <label className="field">
-                  Project
+                  Project or practice
                   <select
                     value={taskDraft.projectId}
                     onChange={(e) =>
@@ -2082,6 +2129,7 @@ export default function App() {
                       .map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
+                          {p.category === "practice" ? " · Practice" : ""}
                           {p.status !== "active" ? ` (${p.status})` : ""}
                         </option>
                       ))}
@@ -2244,15 +2292,21 @@ export default function App() {
         <Modal
           title={
             data.projects.some((p) => p.id === projectDraft.id)
-              ? "Edit project"
-              : "A new project"
+              ? projectDraft.category === "practice"
+                ? "Edit practice"
+                : "Edit project"
+              : projectDraft.category === "practice"
+                ? "A new practice"
+                : "A new project"
           }
           onClose={() => setProjectDraft(null)}
         >
           <form onSubmit={saveProject}>
             <div className="form-body">
               <label className="field">
-                Project name
+                {projectDraft.category === "practice"
+                  ? "Practice name"
+                  : "Project name"}
                 <input
                   autoFocus
                   required
@@ -2265,10 +2319,16 @@ export default function App() {
                 />
               </label>
               <label className="field">
-                Desired outcome
+                {projectDraft.category === "practice"
+                  ? "Direction"
+                  : "Desired outcome"}
                 <textarea
                   rows={2}
-                  placeholder="Describe what done looks like."
+                  placeholder={
+                    projectDraft.category === "practice"
+                      ? "What do you want to keep learning or developing?"
+                      : "Describe what done looks like."
+                  }
                   value={projectDraft.outcome}
                   onChange={(e) =>
                     setProjectDraft({
@@ -2292,6 +2352,7 @@ export default function App() {
                   >
                     <option value="personal">Personal</option>
                     <option value="coursework">Coursework</option>
+                    <option value="practice">Ongoing practice</option>
                   </select>
                 </label>
                 <label className="field">
@@ -2308,7 +2369,11 @@ export default function App() {
                     <option value="active">Active</option>
                     <option value="paused">Paused</option>
                     <option value="someday">Someday / maybe</option>
-                    <option value="complete">Complete</option>
+                    <option value="complete">
+                      {projectDraft.category === "practice"
+                        ? "Archived"
+                        : "Complete"}
+                    </option>
                   </select>
                 </label>
               </div>
@@ -2326,6 +2391,46 @@ export default function App() {
                     }
                   />
                 </label>
+              ) : projectDraft.category === "practice" ? (
+                <>
+                  <label className="field">
+                    A gentle rhythm
+                    <input
+                      placeholder="e.g. Three sessions a week"
+                      value={projectDraft.rhythm || ""}
+                      onChange={(e) =>
+                        setProjectDraft({
+                          ...projectDraft,
+                          rhythm: e.target.value,
+                        })
+                      }
+                    />
+                    <span>
+                      An intention, without automatic scheduling or reminders.
+                    </span>
+                  </label>
+                  <label className="field">
+                    Notes & resources
+                    <textarea
+                      rows={4}
+                      placeholder="A rough learning path, resources, or questions to return to…"
+                      value={projectDraft.notes || ""}
+                      onChange={(e) =>
+                        setProjectDraft({
+                          ...projectDraft,
+                          notes: e.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="inline-note">
+                    <BookOpen size={18} />
+                    <p>
+                      This is an ongoing thread. It doesn’t use a personal
+                      project slot and doesn’t need a finish date.
+                    </p>
+                  </div>
+                </>
               ) : (
                 <div className="inline-note">
                   <Target size={18} />
@@ -2336,14 +2441,16 @@ export default function App() {
                 </div>
               )}
               <label className="field">
-                Project color
+                {projectDraft.category === "practice"
+                  ? "Notebook color"
+                  : "Project color"}
                 <select
                   value={projectDraft.color}
                   onChange={(e) =>
                     setProjectDraft({ ...projectDraft, color: e.target.value })
                   }
                 >
-                  {["violet", "blue", "amber", "rose", "green"].map((v) => (
+                  {["terracotta", "sage", "ochre", "brick", "ink"].map((v) => (
                     <option key={v}>{v}</option>
                   ))}
                 </select>
@@ -2358,7 +2465,10 @@ export default function App() {
                 Cancel
               </button>
               <button type="submit" className="primary-button">
-                Save project <ArrowRight size={14} />
+                {projectDraft.category === "practice"
+                  ? "Save practice"
+                  : "Save project"}{" "}
+                <ArrowRight size={14} />
               </button>
             </div>
           </form>
@@ -2560,25 +2670,12 @@ export default function App() {
             <div className="settings-row">
               <div>
                 <h3>Active personal projects</h3>
-                <p>Protect a little room to focus.</p>
+                <p>
+                  Only active personal projects count. Keep as many paused or
+                  someday projects as you like.
+                </p>
               </div>
-              <select
-                aria-label="Active personal project limit"
-                value={data.settings.limit}
-                onChange={(e) => {
-                  const limit = Number(e.target.value) as 2 | 3;
-                  if (count > limit) {
-                    flash(
-                      "Pause or complete a personal project before lowering your limit.",
-                    );
-                    return;
-                  }
-                  change((d) => ({ ...d, settings: { ...d.settings, limit } }));
-                }}
-              >
-                <option value={2}>2 projects</option>
-                <option value={3}>3 projects</option>
-              </select>
+              <span className="fixed-limit">2 active projects</span>
             </div>
             <div className="settings-data">
               <h3>Your data, on this device</h3>
@@ -2613,7 +2710,7 @@ export default function App() {
                           )
                         )
                           return;
-                        setData(value);
+                        setData(normalize(value));
                         flash("Backup imported. Welcome back.");
                       } catch {
                         flash(

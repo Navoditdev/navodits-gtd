@@ -3,6 +3,7 @@ export type Page =
   | "Inbox"
   | "What can I do now?"
   | "Projects"
+  | "Practices"
   | "Calendar"
   | "Exploration"
   | "Weekly review";
@@ -24,10 +25,13 @@ export type Project = {
   id: string;
   name: string;
   outcome: string;
-  category: "coursework" | "personal";
+  category: "coursework" | "personal" | "practice";
   course: string;
   status: "active" | "paused" | "someday" | "complete";
   color: string;
+  rhythm?: string;
+  notes?: string;
+  entries?: { id: string; date: string; text: string }[];
 };
 export type Exploration = {
   id: string;
@@ -46,6 +50,7 @@ export type Data = {
   settings: { limit: 2 | 3; theme: "dark" | "light"; name: string };
   reviewed: string;
   reviewChecks: boolean[];
+  notice?: string;
 };
 export const uid = () => crypto.randomUUID();
 export function dateKey(date = new Date()): string {
@@ -93,7 +98,7 @@ export function seed(): Data {
   });
   return {
     version: 1,
-    settings: { limit: 3, theme: "dark", name: "Navodit" },
+    settings: { limit: 2, theme: "dark", name: "Navodit" },
     reviewed: "",
     reviewChecks: Array(6).fill(false),
     projects: [
@@ -104,7 +109,7 @@ export function seed(): Data {
         category: "coursework",
         course: "History",
         status: "active",
-        color: "blue",
+        color: "sage",
       },
       {
         id: "p2",
@@ -113,7 +118,7 @@ export function seed(): Data {
         category: "coursework",
         course: "Mathematics",
         status: "active",
-        color: "blue",
+        color: "sage",
       },
       {
         id: "p3",
@@ -122,7 +127,7 @@ export function seed(): Data {
         category: "personal",
         course: "",
         status: "active",
-        color: "violet",
+        color: "terracotta",
       },
       {
         id: "p4",
@@ -131,7 +136,7 @@ export function seed(): Data {
         category: "personal",
         course: "",
         status: "active",
-        color: "amber",
+        color: "ochre",
       },
       {
         id: "p5",
@@ -140,7 +145,7 @@ export function seed(): Data {
         category: "personal",
         course: "",
         status: "someday",
-        color: "rose",
+        color: "brick",
       },
     ],
     tasks: [
@@ -261,7 +266,8 @@ export function validData(v: unknown): v is Data {
     !one(v.settings.limit, [2, 3]) ||
     !one(v.settings.theme, ["dark", "light"]) ||
     !str(v.settings.name) ||
-    !str(v.reviewed)
+    !str(v.reviewed) ||
+    (v.notice !== undefined && !str(v.notice))
   )
     return false;
   if (
@@ -276,8 +282,18 @@ export function validData(v: unknown): v is Data {
       (p) =>
         obj(p) &&
         ["id", "name", "outcome", "course", "color"].every((k) => str(p[k])) &&
-        one(p.category, ["coursework", "personal"]) &&
-        one(p.status, ["active", "paused", "someday", "complete"]),
+        one(p.category, ["coursework", "personal", "practice"]) &&
+        one(p.status, ["active", "paused", "someday", "complete"]) &&
+        (p.rhythm === undefined || str(p.rhythm)) &&
+        (p.notes === undefined || str(p.notes)) &&
+        (p.entries === undefined ||
+          (Array.isArray(p.entries) &&
+            p.entries.every(
+              (entry) =>
+                obj(entry) &&
+                ["id", "date", "text"].every((key) => str(entry[key])) &&
+                /^\d{4}-\d{2}-\d{2}$/.test(entry.date as string),
+            ))),
     )
   )
     return false;
@@ -339,10 +355,43 @@ export function validData(v: unknown): v is Data {
       .length <= (v.settings.limit as number)
   );
 }
+export function normalize(data: Data): Data {
+  let active = 0;
+  const paused: string[] = [];
+  const palette: Record<string, string> = {
+    violet: "terracotta",
+    blue: "sage",
+    amber: "ochre",
+    rose: "brick",
+    green: "sage",
+  };
+  const projects = data.projects.map((original) => {
+    const project = {
+      ...original,
+      color: palette[original.color] || original.color,
+    };
+    if (project.category !== "personal" || project.status !== "active")
+      return project;
+    active += 1;
+    if (active <= 2) return project;
+    paused.push(project.name);
+    return { ...project, status: "paused" as const };
+  });
+  return {
+    ...data,
+    settings: { ...data.settings, limit: 2 },
+    projects,
+    ...(paused.length
+      ? {
+          notice: `Your limit is now two active personal projects. ${paused.map((name) => `“${name}”`).join(", ")} ${paused.length === 1 ? "was" : "were"} moved to Paused. All notes and actions are still here; you can swap which projects are active.`,
+        }
+      : {}),
+  };
+}
 export function load(): Data {
   try {
     const stored = JSON.parse(localStorage.getItem(STORE) || "null");
-    if (validData(stored)) return stored;
+    if (validData(stored)) return normalize(stored);
   } catch {
     /* Keep the original stored value until the user makes a change. */
   }

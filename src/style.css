@@ -3270,20 +3270,47 @@ input[type="checkbox"] {
 }
 
 /* Keep compact layouts comfortable to read in the default dark theme. */
-html { --dim: #85858f; }
-html[data-theme="light"] { --dim: #707079; }
+html {
+  --dim: #85858f;
+}
+html[data-theme="light"] {
+  --dim: #707079;
+}
 @media (min-width: 721px) {
-  .task-title { font-size: 14px; }
-  .task-project { font-size: 10px; }
-  .nav-item { font-size: 13px; }
-  .page-heading p { font-size: 13px; }
-  .section-title h3 { font-size: 13px; }
-  .focus-intro p { font-size: 12px; }
-  .deadline-copy { font-size: 12px; }
-  .project-card h3 { font-size: 14px; }
-  .project-card > p, .exploration-card p { font-size: 11px; }
-  .recommendation-title button { font-size: 15px; }
+  .task-title {
+    font-size: 14px;
+  }
+  .task-project {
+    font-size: 10px;
+  }
+  .nav-item {
+    font-size: 13px;
+  }
+  .page-heading p {
+    font-size: 13px;
+  }
+  .section-title h3 {
+    font-size: 13px;
+  }
+  .focus-intro p {
+    font-size: 12px;
+  }
+  .deadline-copy {
+    font-size: 12px;
+  }
+  .project-card h3 {
+    font-size: 14px;
+  }
+  .project-card > p,
+  .exploration-card p {
+    font-size: 11px;
+  }
+  .recommendation-title button {
+    font-size: 15px;
+  }
 }
 @media (max-width: 720px) {
-  .task-title { font-size: 13px; }
+  .task-title {
+    font-size: 13px;
+  }
 }

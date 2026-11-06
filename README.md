@@ -28,7 +28,7 @@ npm run preview
 - Practices: ongoing learning threads (such as backend learning or LeetCode), with a gentle rhythm, notes and resources, dated session history, a where-you-left-off summary, and optional next actions that appear in What now. Rhythms are descriptive; automated recurrence/reminders are not implemented.
 - Calendar: month and agenda views, separate actual deadlines and planned work dates.
 - Exploration: curiosity cards, editable notes, saved links, tags, and conversion to a personal project.
-- Weekly review: six guided steps with a saved completion date.
+- Weekly review: an automatic all-day task every Saturday, with a 20-minute estimate and six guided steps. It appears in Today on Saturday and stays visible if overdue. Completing the task or guided checklist closes that occurrence and schedules the following Saturday; repeated completion in the same cycle does not skip a week. Missed weeks keep one overdue task rather than creating a backlog. Dates use the device’s local calendar; no timed or push notification is sent.
 - Dark and light appearance, keyboard capture (`N`), workspace search (`Ctrl/Cmd+K`).
 - Browser storage, JSON backup export/import with validation, Android PWA installation, bundled fonts and an offline app shell.
 

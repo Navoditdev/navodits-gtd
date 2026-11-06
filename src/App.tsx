@@ -66,6 +66,9 @@ import {
   rankTasks,
   validData,
   normalize,
+  isWeeklyReview,
+  completeWeeklyReview,
+  isTodayTask,
 } from "./model";
 
 import Practices from "./Practices";
@@ -322,10 +325,20 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [page, selectedProject]);
-  const today = dateKey();
+  const [today, setToday] = useState(dateKey);
+  useEffect(() => {
+    const refresh = () => setToday(dateKey());
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const flash = (message: string) => setToast(message);
   const change = (fn: (d: Data) => Data) => setData((d) => fn(d));
   const go = (p: Page) => {
+    setReviewDone(false);
     setPage(p);
     setMobile(false);
     setSelectedProject(null);
@@ -440,25 +453,37 @@ export default function App() {
       tasks: d.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     }));
   const toggleTask = (task: Task) => {
+    if (isWeeklyReview(task)) {
+      if (task.done) return;
+      change((d) => completeWeeklyReview(d, today));
+      flash("Weekly review complete. Your next Saturday review is scheduled.");
+      return;
+    }
     patchTask(task.id, { done: !task.done });
     flash(task.done ? "Task reopened" : "One less thing on your mind.");
   };
   const getProject = (id: string) => data.projects.find((p) => p.id === id);
   const available = data.tasks.filter((t) => availableTask(t, data.projects));
   const inbox = data.tasks.filter((t) => !t.done && t.state === "inbox");
-  const focused = available.filter((t) => t.focus || t.planned === today);
+  const focused = available.filter((t) => isTodayTask(t, today));
   const deadlines = data.tasks
     .filter((t) => !t.done && t.due)
     .sort((a, b) => a.due.localeCompare(b.due));
   const count = personalCount(data);
   const activeProjects = data.projects.filter((p) => p.status === "active");
-  const reviewDue =
-    !data.reviewed ||
-    Math.floor(
-      (parseDate(today).getTime() - parseDate(data.reviewed).getTime()) /
-        86400000,
-    ) >= 7;
+  const reviewTask = data.tasks.find((t) => isWeeklyReview(t) && !t.done);
+  const reviewDue = Boolean(reviewTask && reviewTask.due <= today);
+  const openTask = (task: Task) => {
+    if (isWeeklyReview(task)) {
+      go("Weekly review");
+      setReviewDone(false);
+    } else setTaskDraft({ ...task });
+  };
   const startFocus = (task: Task) => {
+    if (isWeeklyReview(task)) {
+      openTask(task);
+      return;
+    }
     setFocusTask(task);
     setFocusSeconds(0);
     setFocusRunning(true);
@@ -472,14 +497,17 @@ export default function App() {
           className={"checkbox " + (task.done ? "checked" : "")}
           aria-label={(task.done ? "Reopen " : "Complete ") + task.title}
           onClick={() => toggleTask(task)}
+          disabled={isWeeklyReview(task) && task.done}
         >
           {task.done && <Check size={12} />}
         </button>
-        <button
-          className="task-content"
-          onClick={() => setTaskDraft({ ...task })}
-        >
+        <button className="task-content" onClick={() => openTask(task)}>
           <span className="task-title">{task.title}</span>
+          {isWeeklyReview(task) && (
+            <span className="task-project review-task-label">
+              <CheckCheck size={12} /> Every Saturday · open review
+            </span>
+          )}
           {showProject && project && (
             <span className="task-project">
               <span className={"dot " + project.color} />
@@ -738,7 +766,7 @@ export default function App() {
                 <button
                   className="deadline-row"
                   key={t.id}
-                  onClick={() => setTaskDraft({ ...t })}
+                  onClick={() => openTask(t)}
                 >
                   <span
                     className={"deadline-date " + (t.due < today ? "late" : "")}
@@ -785,17 +813,28 @@ export default function App() {
             <span className="eyebrow">A MOMENT TO RESET</span>
             <h3>Your weekly review</h3>
             <p>Clear the loose ends. See the bigger picture. Start fresh.</p>
+            {reviewTask && (
+              <p className="review-schedule-copy">
+                {reviewDue ? "Due " : "Next: "}
+                {formatDate(reviewTask.due, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })}{" "}
+                · all day
+              </p>
+            )}
             <button
               className="secondary-button"
               onClick={() => go("Weekly review")}
             >
-              {reviewDue ? "Start your review" : "Review again"}
+              {reviewDue ? "Start your review" : "Review early"}
               <ArrowRight size={14} />
             </button>
             <small>
               {data.reviewed
                 ? `Last reviewed ${formatDate(data.reviewed)}`
-                : "About 10 minutes. Just for you."}
+                : "20 minutes. Every Saturday."}
             </small>
           </div>
           <button className="curiosity-nudge" onClick={() => go("Exploration")}>
@@ -982,9 +1021,7 @@ export default function App() {
                     </span>
                     <div>
                       <div className="recommendation-title">
-                        <button onClick={() => setTaskDraft({ ...t })}>
-                          {t.title}
-                        </button>
+                        <button onClick={() => openTask(t)}>{t.title}</button>
                         {i === 0 && (
                           <span className="best-label">
                             A GOOD PLACE TO START
@@ -1411,7 +1448,7 @@ export default function App() {
                             "agenda-item " +
                             (t.due === key ? "event-deadline" : "event-planned")
                           }
-                          onClick={() => setTaskDraft({ ...t })}
+                          onClick={() => openTask(t)}
                         >
                           <span>
                             {t.due === key ? (
@@ -1533,9 +1570,22 @@ export default function App() {
           "Weekly review",
           "A small pause to get clear and start again.",
           <span className="date-pill">
-            <Clock size={14} /> About 10 minutes
+            <Clock size={14} /> Every Saturday · 20 minutes
           </span>,
         )}
+        <div className="review-schedule-banner">
+          <CalendarDays size={17} />
+          <div>
+            <strong>Every Saturday · all day</strong>
+            <p>
+              {reviewTask
+                ? `${reviewDue ? "Due" : "Next review"}: ${formatDate(reviewTask.due, { weekday: "long", month: "long", day: "numeric" })}. `
+                : ""}
+              Finishing this review automatically schedules the next Saturday.
+              Unfinished reviews stay visible in Today.
+            </p>
+          </div>
+        </div>
         {reviewDone ? (
           <div className="review-success">
             <span className="review-orbit">
@@ -1612,11 +1662,7 @@ export default function App() {
                 className="primary-button finish-review"
                 disabled={checked < 6}
                 onClick={() => {
-                  change((d) => ({
-                    ...d,
-                    reviewed: today,
-                    reviewChecks: Array(6).fill(false),
-                  }));
+                  change((d) => completeWeeklyReview(d, today));
                   setReviewDone(true);
                 }}
               >
@@ -1669,6 +1715,11 @@ export default function App() {
   function saveTask(e: FormEvent) {
     e.preventDefault();
     if (!taskDraft?.title.trim()) return;
+    if (isWeeklyReview(taskDraft)) {
+      go("Weekly review");
+      setTaskDraft(null);
+      return;
+    }
     const value = { ...taskDraft, title: taskDraft.title.trim() };
     change((d) => ({
       ...d,
@@ -1799,7 +1850,7 @@ export default function App() {
             kind: t.done ? "Completed task" : "Task",
             open: () => {
               setSearch(null);
-              setTaskDraft({ ...t });
+              openTask(t);
             },
           })),
           ...data.projects.map((p) => ({

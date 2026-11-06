@@ -20,6 +20,7 @@ export type Task = {
   energy: "low" | "medium" | "high";
   context: "computer" | "phone" | "anywhere" | "errands";
   notes: string;
+  recurrence?: "weekly-review-saturday";
 };
 export type Project = {
   id: string;
@@ -321,7 +322,9 @@ export function validData(v: unknown): v is Data {
         Number.isFinite(t.minutes) &&
         t.minutes > 0 &&
         one(t.energy, ["low", "medium", "high"]) &&
-        one(t.context, ["computer", "phone", "anywhere", "errands"]),
+        one(t.context, ["computer", "phone", "anywhere", "errands"]) &&
+        (t.recurrence === undefined ||
+          t.recurrence === "weekly-review-saturday"),
     )
   )
     return false;
@@ -377,7 +380,7 @@ export function normalize(data: Data): Data {
     paused.push(project.name);
     return { ...project, status: "paused" as const };
   });
-  return {
+  return ensureWeeklyReview({
     ...data,
     settings: { ...data.settings, limit: 2 },
     projects,
@@ -386,7 +389,7 @@ export function normalize(data: Data): Data {
           notice: `Your limit is now two active personal projects. ${paused.map((name) => `“${name}”`).join(", ")} ${paused.length === 1 ? "was" : "were"} moved to Paused. All notes and actions are still here; you can swap which projects are active.`,
         }
       : {}),
-  };
+  });
 }
 export function load(): Data {
   try {
@@ -395,7 +398,7 @@ export function load(): Data {
   } catch {
     /* Keep the original stored value until the user makes a change. */
   }
-  return seed();
+  return ensureWeeklyReview(seed());
 }
 export function persist(data: Data): boolean {
   try {
@@ -430,4 +433,77 @@ export function rankTasks(
         Number(b.focus) - Number(a.focus) ||
         a.minutes - b.minutes,
     );
+}
+
+export const isWeeklyReview = (task: Task) =>
+  task.recurrence === "weekly-review-saturday";
+export function nextSaturday(from: string, inclusive = true): string {
+  const date = parseDate(from);
+  let days = (6 - date.getDay() + 7) % 7;
+  if (!inclusive && days === 0) days = 7;
+  date.setDate(date.getDate() + days);
+  return dateKey(date);
+}
+export function ensureWeeklyReview(data: Data, today = dateKey()): Data {
+  if (data.tasks.some((task) => isWeeklyReview(task) && !task.done))
+    return data;
+  const last = data.tasks
+    .filter(isWeeklyReview)
+    .map((task) => task.due)
+    .sort()
+    .at(-1);
+  const due =
+    last && last >= today ? nextSaturday(last, false) : nextSaturday(today);
+  const review: Task = {
+    id: "weekly-review-" + due,
+    title: "Weekly review",
+    projectId: "",
+    state: "next",
+    done: false,
+    focus: false,
+    planned: due,
+    due,
+    minutes: 20,
+    energy: "low",
+    context: "anywhere",
+    notes:
+      "Every Saturday. Clear your inbox, check the week ahead, review projects and practices, and choose your next actions.",
+    recurrence: "weekly-review-saturday",
+  };
+  return { ...data, tasks: [...data.tasks, review] };
+}
+export function completeWeeklyReview(data: Data, today = dateKey()): Data {
+  const scheduled = ensureWeeklyReview(data, today);
+  // A second review in the same Saturday cycle must not complete next week's task.
+  if (
+    scheduled.tasks.some(
+      (task) => isWeeklyReview(task) && task.done && task.due >= today,
+    )
+  ) {
+    return {
+      ...scheduled,
+      reviewed: today,
+      reviewChecks: Array(6).fill(false),
+    };
+  }
+  const task = scheduled.tasks.find(
+    (task) => isWeeklyReview(task) && !task.done,
+  )!;
+  const due = nextSaturday(task.due > today ? task.due : today, false);
+  const done = {
+    ...scheduled,
+    reviewed: today,
+    reviewChecks: Array(6).fill(false),
+    tasks: scheduled.tasks.map((item) =>
+      item.id === task.id ? { ...item, done: true, focus: false } : item,
+    ),
+  };
+  return ensureWeeklyReview(done, due);
+}
+export function isTodayTask(task: Task, today = dateKey()): boolean {
+  return (
+    task.focus ||
+    task.planned === today ||
+    (isWeeklyReview(task) && task.due <= today)
+  );
 }

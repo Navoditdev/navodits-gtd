@@ -6,7 +6,7 @@ The app includes Supabase email-link sign-in and account-scoped offline caching.
 
 The workspace schema has been applied to Supabase project `zsktdwvsgfykluvfshxl`. Both tables have row-level security. Workspace access requires the signed-in user's ID and the owner email in the administrator-managed access table. The Supabase security advisor reported no findings after setup.
 
-Vercel account linking and deployment are pending CLI authentication. An authenticated end-to-end check has not been completed.
+Production is deployed at https://navodits-gtd.vercel.app in Vercel scope `mango-2089` (Hobby). The production sign-in screen loads successfully. Supabase Auth Site URL/redirect allowlist setup and an authenticated end-to-end check are still pending. The GitHub repository is connected for future deployments.
 
 ## Vercel configuration
 

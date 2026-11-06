@@ -34,14 +34,14 @@ npm run preview
 
 Legacy workspaces with three active personal projects are migrated to two: the first two stay active and additional projects move to Paused, with a visible notice and every action/note preserved. Older JSON backups remain importable.
 
-The app starts with editable sample data. Data is stored **only in this browser on this device**. Phone and desktop do not sync yet. Browser data deletion removes the workspace, so keep exported backups. Importing replaces local data after confirmation. No real personal records or credentials are committed to the repository.
+With Supabase configured, the app requires the owner’s email-link sign-in and starts with an empty workspace plus the Saturday review. It syncs across signed-in devices and caches offline edits per account. Concurrent changes require an explicit choice between device and cloud copies, with a backup download. Importing replaces the workspace and syncs that replacement. Without Supabase configuration, the local preview uses editable sample data and browser-only storage. Keep exported backups.
 
 Open the production app online once and let its service worker install before using it offline. Install from Chrome's menu → Add to home screen / Install app. A hosted private preview may require owner authentication; offline support applies to the cached app after a successful online visit.
 
 ## Stack
 
-React 19, TypeScript, Vite, Lucide icons, bundled Inter typography, CSS design tokens, localStorage, and a generated versioned service worker. Hosting is static; no server or API keys are required for this phase. `.openai/hosting.json` identifies the private Sites preview.
+React 19, TypeScript, Vite, Supabase Auth/Postgres, Lucide icons, bundled Inter typography, CSS design tokens, localStorage, and a generated versioned service worker. Vercel hosts the static PWA. `.openai/hosting.json` identifies the older private Sites preview. See DEPLOYMENT.md for configuration.
 
 ## Next phase
 
-Authentication, a Supabase/Postgres data model with per-user access rules, cross-device sync and conflict handling, followed by recurring tasks, reminders, and external calendar integrations. Those features are not implemented in this version.
+General recurring tasks, timed reminders, automatic conflict merging, and external calendar integrations are not implemented. Weekly Saturday reviews are recurring already.
